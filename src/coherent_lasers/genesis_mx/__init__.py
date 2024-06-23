@@ -2,7 +2,8 @@
 Driver for Coherent Genesis MX series lasers.
 
 Setup:
-- If using the HOPSDevice class, ensure the CohrHOPS DLL files are in the 'dll' directory within the 'common/hops' package.
+- If using the HOPSDevice class, ensure the CohrHOPS DLL files are in the 'dll' directory within the 'common/hops'
+package.
 
 Classes:
 - GenesisMX: Driver for Coherent Genesis MX series lasers.
@@ -13,19 +14,18 @@ Classes:
 - GenesisMXVoxelLaser: Voxel wraper for GenesisMX class.
 """
 
-from .commands import (ReadCmds as GenesisMXReadCmds,
-                       WriteCmds as GenesisMXWriteCmds,
-                       OperationModes as GenesisMXOperationModes,
-                       Alarms as GenesisMXAlarms
-                       )
-from .genesis_mx import GenesisMX
-from .genesis_mx_voxel import GenesisMXVoxelLaser
+from .commands import (
+    ReadCmds as GenesisMXReadCmds,
+    WriteCmds as GenesisMXWriteCmds,
+    OperationModes as GenesisMXOperationModes,
+    Alarms as GenesisMXAlarms,
+)
+from .driver import GenesisMX
 
 __all__ = [
-    'GenesisMX',
-    'GenesisMXVoxelLaser',
-    'GenesisMXOperationModes',
-    'GenesisMXAlarms',
-    'GenesisMXReadCmds',
-    'GenesisMXWriteCmds'
+    "GenesisMX",
+    "GenesisMXOperationModes",
+    "GenesisMXAlarms",
+    "GenesisMXReadCmds",
+    "GenesisMXWriteCmds",
 ]
