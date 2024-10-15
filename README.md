@@ -33,44 +33,11 @@ Repository is organized by laser model. Each laser model has its own directory c
 
 ## Installation
 
-### Option 1: Install from GitHub Release
-
 You can install the `coherent_lasers` package directly from a GitHub release using `pip`.
 
-**Install Using the ZIP Archive:**
-
 ```bash
-pip install https://github.com/AllenNeuralDynamics/coherent_lasers/archive/refs/tags/v0.1.0.zip
-```
-
-**Install Using the Tarball Archive:**
-
-```bash
-pip install https://github.com/AllenNeuralDynamics/coherent_lasers/archive/refs/tags/v0.1.0.tar.gz
+cohrhops_version=0.1.0
+pip install https://github.com/AllenNeuralDynamics/coherent_lasers/releases/download/v${cohrhops_version}/coherent_lasers-${cohrhops_version}-py3-none-any.whl
 ```
 
 **Note**: Replace v0.1.0 with the tag of the release you want to install.
-
-### Option 2: Clone the Repository and Install Locally
-
-If you prefer to clone the repository and install it locally, follow these steps:
-
-1. Clone the Repository:
-
-   ```bash
-   git clone https://github.com/your-username/coherent_lasers.git
-   cd coherent_lasers
-   ```
-
-2. Install the Package:
-   For regular use:
-
-   ```bash
-   pip install .
-   ```
-
-   For development (includes dev dependencies):
-
-   ```bash
-   pip install -e .[dev]
-   ```
