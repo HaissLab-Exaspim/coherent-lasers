@@ -17,9 +17,11 @@ Repository is organized by laser model. Each laser model has its own directory c
    ├── src/
    │   ├── common/
    │   │   ├── hops/
-   │   │   │   ├── dll/
-   │   │   │   │   └── (DLL files go here)
-   │   │   │   └── hops_device.py
+   │   │   │   ├── CohrFTCI2C.h
+   │   │   │   ├── CohrHOPS.h
+   │   │   │   ├── (DLL files for each .h file)
+   │   │   │   ├── manager.py
+   │   │   │   └── device.py
    │   │   ├── serial/
    │   │   │   └── serial_device.py
    │   ├── genesis_mx/

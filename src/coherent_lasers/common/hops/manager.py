@@ -2,11 +2,7 @@ import ctypes as C
 import logging
 import os
 
-current_dir = os.path.dirname(os.path.abspath(__file__))
-DLL_DIR = os.path.join(current_dir, "dll")
-print(DLL_DIR)
-
-os.add_dll_directory(DLL_DIR)
+from . import DLL_DIR
 
 HOPS_DLL = os.path.join(DLL_DIR, "CohrHOPS.dll")
 

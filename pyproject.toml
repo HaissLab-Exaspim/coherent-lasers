@@ -6,17 +6,11 @@ build-backend = "setuptools.build_meta"
 name = "coherent_lasers"
 description = "A python package for controlling coherent lasers"
 license = { text = "MIT" }
-requires-python = ">=3.11"
+requires-python = ">=3.10"
 authors = [
     { name = "Walter Mwaniki", email = "walter.mwaniki@alleninstitute.org" },
 ]
-classifiers = [
-    "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.7",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
-    "Operating System :: OS Independent",
-]
+classifiers = ["Programming Language :: Python :: 3.10"]
 readme = "README.md"
 keywords = ["laser", "coherent", "drivers", "hardware control"]
 dynamic = ["version"]
@@ -37,17 +31,25 @@ dev = [
 ]
 
 [tool.setuptools]
-packages = ["coherent_lasers"]
 package-dir = { "" = "src" }
 include-package-data = true
-package-data = { "coherent_lasers.common.hops" = ["dll/*.dll"] }
+py-modules = []
+
+[tool.setuptools.package-data]
+"coherent_lasers.common.hops" = ["CohrFTCI2C.dll", "CohrHOPS.dll"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["coherent_lasers*"]
+namespaces = false
+
 
 [tool.setuptools.dynamic]
 version = { attr = "coherent_lasers.__version__" }
 
 [tool.black]
 line-length = 120
-target-version = ["py37"]
+target-version = ["py310"]
 exclude = '''
 (
     /(
