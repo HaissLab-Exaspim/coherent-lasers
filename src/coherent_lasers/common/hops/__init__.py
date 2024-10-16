@@ -25,8 +25,9 @@ if not (sys.platform.startswith("win") and platform.machine().endswith("64")):
     raise OSError("This package only supports 64-bit Windows systems.")
 
 # Setup logging
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.ERROR)
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.ERROR)
 
 DLL_DIR = os.path.dirname(__file__)
 
@@ -42,8 +43,6 @@ for dll_name in REQUIRED_DLLS:
     dll_path = find_library(dll_name)
     if dll_path is None:
         raise FileNotFoundError(f"Required 64-bit DLL file not found: {dll_name}.dll")
-    else:
-        logger.debug(f"Found 64-bit {dll_name}.dll at: {dll_path}")
 
 # Try to load the DLLs to ensure they're accessible
 try:
@@ -53,9 +52,6 @@ except Exception as e:
     logger.error(f"Error loading 64-bit DLLs: {e}")
     raise
 
-logger.debug("HOPS DLL Utilities Package (64-bit) initialized successfully.")
+# from .device import HOPSDevice
 
-
-from .device import HOPSDevice
-
-__all__ = ["HOPSDevice"]
+# __all__ = ["HOPSDevice"]

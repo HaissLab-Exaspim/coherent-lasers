@@ -161,13 +161,9 @@ class HOPSManager:
         if res != COHRHOPS_OK:
             raise HOPSException(f"Error checking for devices", res)
         
-        if self.number_of_devices_connected.value > 0:
-            for ser, device in self.devices.items():
-                if device.handle not in 
-
-
-
-
+        # if self.number_of_devices_connected.value > 0:
+        #     for ser, device in self.devices.items():
+        #         if device.handle not in 
 
     def _initialize_devices(self):
         self._refresh_device_info()
