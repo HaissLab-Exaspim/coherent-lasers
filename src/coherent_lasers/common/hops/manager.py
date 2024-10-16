@@ -1,6 +1,9 @@
 import ctypes as C
+from dataclasses import dataclass
 import logging
 import os
+
+from coherent_lasers.common.hops.device import HOPSDevice
 
 from . import DLL_DIR
 
@@ -24,7 +27,7 @@ class HOPSException(Exception):
         -100: "Secondary DLL not found",
     }
 
-    def __init__(self, message: str, code: str) -> None:
+    def __init__(self, message: str, code: str | None = None) -> None:
         full_message = f"{message}: {self.ERROR_MESSAGES.get(code, f'Unknown error code: {code}')}"
         super().__init__(full_message)
         self.message = full_message
@@ -44,6 +47,12 @@ class HOPSDevices:
     def pointer(self):
         return self.devices
 
+@dataclass
+class HOPSDeviceStatus:
+    serial: str
+    handle: COHRHOPS_HANDLE
+    isActive: bool
+
 
 class HOPSManager:
     def __init__(self, dll_path=HOPS_DLL):
@@ -52,11 +61,21 @@ class HOPSManager:
         self._dll = C.CDLL(dll_path)
         self._wrap_functions()
 
-        self.devices: dict[str, COHRHOPS_HANDLE] = {}
+        self.devices_connected = HOPSDevices()
+        self.number_of_devices_connected = C.c_ulong()
+        self.devices_added = HOPSDevices()
+        self.number_of_devices_added = C.c_ulong()
+        self.devices_removed = HOPSDevices()
+        self.number_of_devices_removed = C.c_ulong()
+
+        self.serials: dict[COHRHOPS_HANDLE, str] = {}
+
+        self.devices: dict[COHRHOPS_HANDLE,  HOPSDevice] = {}
+
         self._initialize_devices()
 
     def __repr__(self):
-        return f"HOPSDeviceManager with {len(self.devices)} devices: {self.devices}"
+        return f"HOPSDeviceManager with {len(self.devices)} devices: {self.serials}"
 
     @property
     def version(self) -> str:
@@ -67,30 +86,47 @@ class HOPSManager:
         else:
             raise Exception(f"Error getting DLL version: {res}")
 
-    def get_device_handle(self, serial: str) -> COHRHOPS_HANDLE:
-        handle = self.devices.get(serial)
-        if handle is None:
-            raise ValueError(f"Device with serial number {serial} not found")
-        return handle
+    def get_device_serial(self, handle: COHRHOPS_HANDLE) -> str:
+        response = C.create_string_buffer(MAX_STRLEN)
+        res = self._send_command(handle, "?HID".encode("utf-8"), response)
+        if res == COHRHOPS_OK:
+            return response.value.decode("utf-8").strip()
+        else:
+            raise HOPSException(f"Error getting serial number for handle {handle}", res)
 
-    def initialize_device(self, *, handle: COHRHOPS_HANDLE | None, serial: str | None = None) -> dict:
-        handle = self._get_device_handle(serial) if handle is None else handle
-        return self._initialize_device_by_handle(handle)
+    def get_device_handle(self,*, serial: str) -> COHRHOPS_HANDLE:
+        for handle, ser in self.serials.items():
+            if serial == ser:
+                return handle
+        self._initialize_devices()
+        handle = next(k for k,v in self.serials.items() if v == serial)
+        if handle:
+            return handle
+        raise HOPSException(f"Device with serial no: {serial} could not be found")
 
-    def close_device(self, *, handle: COHRHOPS_HANDLE | None, serial: str | None = None) -> None:
-        handle = self._get_device_handle(serial) if handle is None else handle
+    def close_device(self,*, handle: COHRHOPS_HANDLE) -> None:
         res = self._close(handle)
-        if res != COHRHOPS_OK:
+        if res == COHRHOPS_OK:
+            if handle in self.serials:
+                self.serials.pop(handle)
+        else:
             raise HOPSException("Error closing handle", res)
 
-    def send_device_command(self, command: str, serial: str) -> str:
-        handle = self._get_device_handle(serial)
+    def send_device_command(self, command: str,*,handle: COHRHOPS_HANDLE) -> str:
         response = C.create_string_buffer(MAX_STRLEN)
         res = self._send_command(handle, command.encode(), response)
         if res == COHRHOPS_OK:
             return response.value.decode("utf-8")
         else:
             raise HOPSException("Error sending command", res)
+
+    def close(self):
+        self._refresh_device_info()
+        for handle in self.devices_connected[: self.number_of_devices_connected.value]:
+            self._close(handle)
+
+    def __del__(self):
+        self.close()
 
     def _wrap_functions(self):
         self._initialize_handle = self._dll.CohrHOPS_InitializeHandle
@@ -113,47 +149,53 @@ class HOPSManager:
         self._check_for_devices.argtypes = [LPULPTR, LPDWORD, LPULPTR, LPDWORD, LPULPTR, LPDWORD]
         self._check_for_devices.restype = int
 
-    def _initialize_devices(self):
-        devices_connected = HOPSDevices()
-        number_of_devices_connected = C.c_ulong()
-        devices_added = HOPSDevices()
-        number_of_devices_added = C.c_ulong()
-        devices_removed = HOPSDevices()
-        number_of_devices_removed = C.c_ulong()
-
+    def _refresh_device_info(self) -> None:
         res = self._check_for_devices(
-            devices_connected.pointer(),
-            C.byref(number_of_devices_connected),
-            devices_added.pointer(),
-            C.byref(number_of_devices_added),
-            devices_removed.pointer(),
-            C.byref(number_of_devices_removed),
+            self.devices_connected.pointer(),
+            C.byref(self.number_of_devices_connected),
+            self.devices_added.pointer(),
+            C.byref(self.number_of_devices_added),
+            self.devices_removed.pointer(),
+            C.byref(self.number_of_devices_removed),
         )
-
         if res != COHRHOPS_OK:
             raise HOPSException(f"Error checking for devices", res)
+        
+        if self.number_of_devices_connected.value > 0:
+            for ser, device in self.devices.items():
+                if device.handle not in 
 
-        if number_of_devices_connected.value > 0:
-            for handle in devices_connected[: number_of_devices_connected.value]:
-                self._initialize_device_by_handle(handle)
+
+
+
+
+    def _initialize_devices(self):
+        self._refresh_device_info()
+
+        if self.number_of_devices_connected.value > 0:
+            self.serials.clear()
+            for handle in self.devices_connected[: self.number_of_devices_connected.value]:
+                self._initialize_device_by_handle(handle=handle)
         else:
             self.log.debug("No devices connected")
 
-    def _initialize_device_by_handle(self, handle: COHRHOPS_HANDLE) -> dict:
+    def _initialize_device_by_handle(self, handle: COHRHOPS_HANDLE) -> None:
         headtype = C.create_string_buffer(MAX_STRLEN)
         res = self._initialize_handle(handle, headtype)
-        if res == COHRHOPS_OK:
-            serial = self._get_device_serial(handle)
-            self.devices[serial] = handle
-            self.log.debug(f"Device {serial} initialized with handle {handle}")
-            return {"serial": serial, "handle": handle}
-        else:
-            raise HOPSException("Error initializing device", res)
+        # if res != COHRHOPS_OK:
+        #     raise HOPSException("Error initializing device")
+        serial = self.get_device_serial(handle=handle)
 
-    def _get_device_serial(self, handle: COHRHOPS_HANDLE) -> str:
-        response = C.create_string_buffer(MAX_STRLEN)
-        res = self._send_command(handle, "?HID".encode("utf-8"), response)
-        if res == COHRHOPS_OK:
-            return response.value.decode("utf-8").strip()
-        else:
-            raise Exception(f"Error sending command to handle {handle}: {res}")
+
+        self.serials[handle] = serial
+
+    def initialize_device(self, serial: str):
+        if serial not in self.devices:
+            pass
+        device = self.devices[serial]
+        if device.handle in self.devices_connected.devices:
+            if not device.isActive:
+                headtype = C.create_string_buffer(MAX_STRLEN)
+                res = self._initialize_handle(device.handle, headtype)
+                if res != COHRHOPS_OK:
+                    raise HOPSException(f"Error initializing device: {device}")

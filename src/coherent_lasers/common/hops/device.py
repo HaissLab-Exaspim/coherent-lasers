@@ -18,25 +18,13 @@ hops_manager = _get_threadsafe_manager()
 
 
 class HOPSDevice:
-
+    _manager = hops_manager
     def __init__(self, serial: str):
         self.serial = serial
-        self._manager = hops_manager
+        self.handle = self._manager.get_device_handle(serial=self.serial)
 
     def send_command(self, command: str) -> None:
-        self._manager.send_device_command(self.serial, command)
+        self._manager.send_device_command(command, handle=self.handle)
 
     def close(self):
-        self._manager.close_device(self.serial)
-
-    def __enter__(self) -> "HOPSDevice":
-        return self
-
-    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
-        self.close()
-
-    def __del__(self) -> None:
-        try:
-            self.close()
-        except Exception:
-            pass  # Ignore errors during garbage collection
+        self._manager.close_device(handle=self.handle)

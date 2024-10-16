@@ -13,31 +13,34 @@ def run_integration_tests():
         manager = HOPSManager()
         logger.info(f"HOPSManager initialized. Version: {manager.version}")
 
-        # Check for connected devices
-        logger.info(f"Connected devices: {manager.devices}")
-
-        if not manager.devices:
+        if not manager.devices_connected:
             logger.warning("No devices found. Please connect a device and run the test again.")
             return
+        
+        # Check for connected devices
+        logger.info(f"Connected devices: {manager.serials}")
+
+        def test_send_commands(device):
+            # Test sending commands
+            test_commands = [
+                "?HID",  # Get Head ID
+                "?HTYPE",  # Get Head Type
+                "?HH",  # Get Head Hours
+                # Add more commands here based on your device's capabilities
+            ]
+
+            for cmd in test_commands:
+                try:
+                    response = device.send_command(cmd)
+                    logger.info(f"Command '{cmd}' response: {response}")
+                except HOPSException as e:
+                    logger.error(f"Error sending command '{cmd}': {e}")
 
         # Test with the first connected device
-        serial = list(manager.devices.keys())[0]
+        serial = list(manager.serials.values())[0]
         device = HOPSDevice(serial)
 
-        # Test sending commands
-        test_commands = [
-            "?HID",  # Get Head ID
-            "?HTYPE",  # Get Head Type
-            "?HH",  # Get Head Hours
-            # Add more commands here based on your device's capabilities
-        ]
-
-        for cmd in test_commands:
-            try:
-                response = device.send_command(cmd)
-                logger.info(f"Command '{cmd}' response: {response}")
-            except HOPSException as e:
-                logger.error(f"Error sending command '{cmd}': {e}")
+        test_send_commands(device)
 
         # Test closing the device
         device.close()
@@ -46,6 +49,7 @@ def run_integration_tests():
         # Test re-opening the device
         device = HOPSDevice(serial)
         logger.info("Device re-opened successfully")
+        test_send_commands(device)
 
     except HOPSException as e:
         logger.error(f"HOPS Exception occurred: {e}")
@@ -54,11 +58,12 @@ def run_integration_tests():
     finally:
         # Ensure all devices are closed
         if "manager" in locals():
-            for serial in manager.devices:
-                try:
-                    manager.close_device(serial=serial)
-                except Exception as e:
-                    logger.error(f"Error closing device {serial}: {e}")
+            manager.close()
+            # for serial in manager.serials:
+            #     try:
+            #         manager.close_device(serial=serial)
+            #     except Exception as e:
+            #         logger.error(f"Error closing device {serial}: {e}")
 
 
 if __name__ == "__main__":
