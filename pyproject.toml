@@ -30,6 +30,9 @@ dev = [
     'furo',
 ]
 
+[project.scripts]
+genesis-mx = "coherent_lasers.genesis_mx.app:cli"
+
 [tool.setuptools]
 package-dir = { "" = "src" }
 include-package-data = true

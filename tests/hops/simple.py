@@ -1,72 +1,39 @@
-from coherent_lasers.common.hops.hops_device import HOPSManager
+import logging
 
-import os
-import ctypes as C
-
-HOPS_DLL = "C:\\Program Files (x86)\\Coherent\\HOPS\\CohrHOPS.dll"
-os.add_dll_directory(os.getcwd())
-dll = C.CDLL(HOPS_DLL)
-
-LPSTRING = C.Array[C.c_char]
-LPDWORD = C.POINTER(C.c_ulong)
-
-get_dll_version = dll.CohrHOPS_GetDLLVersion
-get_dll_version.argtypes = [LPSTRING]
-
-buffer: LPSTRING = C.create_string_buffer(100)
+from coherent_lasers.common.hops.main import HOPSDevice, HOPSException, get_hops_manager
 
 
-def print_buffer():
-    print(buffer.value.decode("utf-8"))
+logging.basicConfig(level=logging.DEBUG)
 
 
-get_dll_version(buffer)
-print_buffer()
-
-devices_connected = LPDWORD()
-number_of_devices_connected = LPDWORD()
-devices_added = LPDWORD()
-number_of_devices_added = LPDWORD()
-devices_removed = LPDWORD()
-number_of_devices_removed = LPDWORD()
-
-devices_connected.contents = C.c_ulong(0)
-number_of_devices_connected.contents = C.c_ulong(0)
-devices_added.contents = C.c_ulong(0)
-number_of_devices_added.contents = C.c_ulong(0)
-devices_removed.contents = C.c_ulong(0)
-number_of_devices_removed.contents = C.c_ulong(0)
+def get_head_id(device: HOPSDevice) -> str:
+    return device.send_command("?HID")
 
 
-def print_devices():
-    if devices_connected and devices_connected.contents is not None:
-        print("Devices connected: ", devices_connected.contents.value)
-    if number_of_devices_connected and number_of_devices_connected.contents is not None:
-        print("Number of devices connected: ", number_of_devices_connected.contents.value)
-    if devices_added and devices_added.contents is not None:
-        print("Devices added: ", devices_added.contents.value)
-    if number_of_devices_added and number_of_devices_added.contents is not None:
-        print("Number of devices added: ", number_of_devices_added.contents.value)
-    if devices_removed and devices_removed.contents is not None:
-        print("Devices removed: ", devices_removed.contents.value)
-    if number_of_devices_removed and number_of_devices_removed.contents is not None:
-        print("Number of devices removed: ", number_of_devices_removed.contents.value)
+try:
+    # Get the DLL version
+    manager = get_hops_manager()
+    print(f"HOPS DLL Version: {manager.version}")
 
+    serials = manager._handles.values()
+    print(f"Discovered HOPS devices: {serials}")
+    # SERIAL1 = "A700467EP203"
+    # SERIAL2 = "J687424BP914"
+    # SERIAL3 = "R708588EQ173"
 
-check_for_devices = dll.CohrHOPS_CheckForDevices
-check_for_devices.argtypes = [LPDWORD, LPDWORD, LPDWORD, LPDWORD, LPDWORD, LPDWORD]
+    devices = [HOPSDevice(serial) for serial in serials]
 
-check_for_devices(
-    devices_connected,
-    number_of_devices_connected,
-    devices_added,
-    number_of_devices_added,
-    devices_removed,
-    number_of_devices_removed,
-)
-print_devices()
+    print(f"Active devices: {manager._active_serials}")
 
+    for device in devices:
+        device_id = get_head_id(device)
+        print(f"Device ID: {device_id}")
+        device.close()
 
-manager = HOPSManager()
+    print("All devices closed.")
+    print(f"Active devices: {manager._active_serials}")
 
-print(manager.dll_version)
+except HOPSException as e:
+    print(f"HOPS Error: {e}")
+except Exception as e:
+    print(f"Unexpected error: {e}")

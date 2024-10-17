@@ -2,18 +2,21 @@ from coherent_lasers.genesis_mx.commands import ReadCmds, WriteCmds, OperationMo
 from coherent_lasers.common.hops import HOPSDevice
 
 
-class GenesisMX(HOPSDevice):
+class GenesisMX:
     def __init__(self, serial: str):
-        super().__init__(serial)
+        self.serial = serial
+        self.hops = HOPSDevice(self.serial)
+        if not self.hops:
+            raise ValueError(f"Failed to initialize laser with serial number {self.serial}")
 
     def send_read_command(self, cmd: ReadCmds):
         """Send a read command to the laser."""
-        return self.send_command(cmd.value)
+        return self.hops.send_command(cmd.value)
 
     def send_write_command(self, cmd: WriteCmds, value: float = None):
         """Send a write command to the laser."""
         if value is not None:
-            self.send_command(f'{cmd.value}{value}')
+            self.hops.send_command(f"{cmd.value}{value}")
         else:
             self.send_command(cmd.value)
 
@@ -22,32 +25,32 @@ class GenesisMX(HOPSDevice):
         if self.is_key_switch_closed:
             self.send_write_command(WriteCmds.SET_SOFTWARE_SWITCH, 1)
         else:
-            raise ValueError(f'Key switch is not closed for laser {self.serial}')
+            raise ValueError(f"Key switch is not closed for laser {self.serial}")
 
-    def disable(self):
+    def disable(self) -> None:
         """Disable the laser."""
         self.send_write_command(WriteCmds.SET_SOFTWARE_SWITCH, 0)
 
     @property
-    def mode(self):
+    def mode(self) -> OperationModes:
         """Get the current mode of the laser: current mode or photomode."""
         mode_value = self.send_read_command(ReadCmds.CURRENT_MODE)
         return OperationModes(int(mode_value))
 
     @mode.setter
-    def mode(self, value: OperationModes):
+    def mode(self, value: OperationModes) -> None:
         """Set the mode of the laser."""
         self.send_write_command(WriteCmds.SET_MODE, value.value)
 
     @property
-    def alarms(self):
+    def alarms(self) -> list[Alarms]:
         """Get the list of active alarms based on the fault code."""
         fault_code_value = int(self.send_read_command(ReadCmds.FAULT_CODE), 16)
         faults = Alarms.from_code(fault_code_value)
         return faults
 
     @property
-    def power_mw(self):
+    def power_mw(self) -> float:
         """Get the current power of the laser."""
         return float(self.send_read_command(ReadCmds.POWER))
 
@@ -171,7 +174,7 @@ class GenesisMX(HOPSDevice):
             "type": ReadCmds.HEAD_TYPE,
             "hours": ReadCmds.HEAD_HOURS,
             "board_revision": ReadCmds.HEAD_BOARD_REVISION,
-            "dio_status": ReadCmds.HEAD_DIO_STATUS
+            "dio_status": ReadCmds.HEAD_DIO_STATUS,
         }
 
         for key, command in commands.items():
@@ -183,7 +186,7 @@ class GenesisMX(HOPSDevice):
         return head_info
 
     @property
-    def is_interlocked(self) -> bool:
+    def is_interlock_switch_closed(self) -> bool:
         """
         Get the interlock status of the laser.
 
@@ -215,7 +218,7 @@ class GenesisMX(HOPSDevice):
         """
         Check if the laser is enabled.
         """
-        return self.is_interlocked and self.is_key_switch_closed and self.is_software_switch_closed
+        return self.is_interlock_switch_closed and self.is_key_switch_closed and self.is_software_switch_closed
 
     @property
     def is_analog_input_enabled(self) -> bool:
@@ -249,3 +252,7 @@ class GenesisMX(HOPSDevice):
         Reads whether the Laser Diode Driver (LDD) is enabled or disabled.
         """
         return self.send_read_command(ReadCmds.LDD_ENABLE_STATE) == 1
+
+    def close(self) -> None:
+        self.power_setpoint_mw = 0
+        self.hops.close()
