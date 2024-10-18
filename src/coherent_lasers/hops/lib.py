@@ -47,7 +47,10 @@ LPSTR = C.c_char_p
 
 
 class HOPSException(Exception):
-    pass
+    def __init__(self, message, code: int | None = None) -> None:
+        if code is not None:
+            message = f"{message} (Error code: {code})"
+        super().__init__(message)
 
 
 class HOPSDevicesList:
@@ -95,7 +98,7 @@ class HOPSManager:
         response = C.create_string_buffer(MAX_STRLEN)
         res = self._send_command(handle, command.encode(), response)
         if res != COHRHOPS_OK:
-            raise HOPSException(f"Error sending command to device {serial}")
+            raise HOPSException(f"Error sending command to device {serial}", res)
         return response.value.decode("utf-8")
 
     @property
@@ -146,7 +149,7 @@ class HOPSManager:
         )
         if res != COHRHOPS_OK:
             raise HOPSException(f"Error checking for devices: {res}")
-        self.log.debug(f"Updated devices info. Connected: {self._number_of_devices_connected.value}")
+        self._log.debug(f"Updated devices info. Connected: {self._number_of_devices_connected.value}")
 
     def _activate_all_devices(self):
         self._log.debug("Activating all devices...")
@@ -160,7 +163,7 @@ class HOPSManager:
         self._log.debug("Active Devices: " + str(self._active_serials))
 
     def _validate_active_devices(self):
-        self.log.debug("Validating active devices...")
+        self._log.debug("Validating active devices...")
         connected_handles = {self._devices_connected[i] for i in range(self._number_of_devices_connected.value)}
         for handle in connected_handles:
             self._initialize_device_by_handle(handle)

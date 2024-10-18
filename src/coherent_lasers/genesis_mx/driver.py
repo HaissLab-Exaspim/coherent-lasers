@@ -1,6 +1,8 @@
 from dataclasses import dataclass
+import logging
 from coherent_lasers.genesis_mx.commands import ReadCmds, WriteCmds, OperationModes, Alarms
-from coherent_lasers.common.hops import HOPSDevice
+from coherent_lasers.hops import HOPSDevice
+from ..hops.lib import HOPSException
 
 
 @dataclass(frozen=True)
@@ -16,6 +18,7 @@ class GenesisMXTempMetrics:
     brf: GenesisMXTempMetric
     shg: GenesisMXTempMetric
 
+
 @dataclass(frozen=True)
 class GenesisMXHeadInfo:
     serial: str
@@ -23,6 +26,7 @@ class GenesisMXHeadInfo:
     hours: str
     board_revision: str
     dio_status: str
+
 
 @dataclass(frozen=True)
 class GenesisMXEnableLoop:
@@ -38,9 +42,13 @@ class GenesisMXEnableLoop:
     def ready(self) -> bool:
         return self.interlock and self.key and not self.software
 
+    def __repr__(self) -> str:
+        return f"Software: {self.software}, Interlock: {self.interlock}, Key: {self.key}"
+
 
 class GenesisMX:
-    def __init__(self, serial: str):
+    def __init__(self, serial: str, logger: logging.Logger = None) -> None:
+        self.log = logger if logger else logging.getLogger(f"{__name__}.{serial}")
         self.serial = serial
         self.hops = HOPSDevice(self.serial)
         if not self.hops:
@@ -60,20 +68,22 @@ class GenesisMX:
     @property
     def power_mw(self) -> float:
         """Get the current power of the laser."""
-        return float(self.send_read_command(ReadCmds.POWER))
+        return self.send_read_float_command(ReadCmds.POWER)
 
     @power_mw.setter
-    def power_mw(self, value: float):
+    def power_mw(self, value: float) -> None:
         """Set the power of the laser."""
         self.send_write_command(WriteCmds.SET_POWER, value)
+        if not self.enable_loop.enabled:
+            self.log.warning(f"Attempting to set power to {value} mW while laser is disabled.")
 
     @property
-    def power_setpoint_mw(self):
+    def power_setpoint_mw(self) -> float:
         """Get the current power setpoint of the laser."""
         return float(self.send_read_command(ReadCmds.POWER_SETPOINT))
 
     @property
-    def ldd_current(self):
+    def ldd_current(self) -> float:
         """
         Get the LDD current of the laser.
 
@@ -82,7 +92,7 @@ class GenesisMX:
         return float(self.send_read_command(ReadCmds.LDD_CURRENT))
 
     @property
-    def ldd_current_limit(self):
+    def ldd_current_limit(self) -> float:
         """
         Get the LDD current limit of the laser.
 
@@ -93,18 +103,15 @@ class GenesisMX:
     @property
     def enable_loop(self) -> GenesisMXEnableLoop:
         return GenesisMXEnableLoop(
-            software=self.send_read_command(ReadCmds.SOFTWARE_SWITCH_STATE) == 1,
-            interlock=self.send_read_command(ReadCmds.INTERLOCK_STATUS) == 1,
-            key=self.send_read_command(ReadCmds.KEY_SWITCH_STATE) == 1,
+            software=self.send_read_bool_command(ReadCmds.SOFTWARE_SWITCH_STATE),
+            interlock=self.send_read_bool_command(ReadCmds.INTERLOCK_STATUS),
+            key=self.send_read_bool_command(ReadCmds.KEY_SWITCH_STATE),
         )
 
     def enable(self) -> GenesisMXEnableLoop:
         """Enable the laser."""
-        if self.enable_loop.ready:
-            self.send_write_command(WriteCmds.SET_SOFTWARE_SWITCH, 1)
-            return self.enable_loop
-        else:
-            raise ValueError(f"Cannot enable laser {self.serial}. Check interlock and key switch: {self.enable_loop}")
+        self.send_write_command(WriteCmds.SET_SOFTWARE_SWITCH, 1)
+        return self.enable_loop
 
     def disable(self) -> GenesisMXEnableLoop:
         """Disable the laser."""
@@ -118,7 +125,7 @@ class GenesisMX:
 
         Reads whether the Laser Diode Driver (LDD) is enabled or disabled.
         """
-        return self.send_read_command(ReadCmds.LDD_ENABLE_STATE) == 1
+        return self.send_read_bool_command(ReadCmds.LDD_ENABLE_STATE)
 
     # Flags
 
@@ -129,11 +136,10 @@ class GenesisMX:
 
         Reads the status of the analog input (enabled or disabled).
         """
-        state = self.send_read_command(ReadCmds.ANALOG_INPUT_STATUS)
-        return state == 1
+        return self.send_read_bool_command(ReadCmds.ANALOG_INPUT_STATUS)
 
     @analog_input_enable.setter
-    def analog_input_enable(self, value: bool):
+    def analog_input_enable(self, value: bool) -> None:
         """Set the analog input status of the laser."""
         self.send_write_command(WriteCmds.SET_ANALOG_INPUT, 1 if value else 0)
 
@@ -144,7 +150,7 @@ class GenesisMX:
 
         Reads whether remote control is enabled or disabled.
         """
-        return self.send_read_command(ReadCmds.REMOTE_CONTROL_STATUS) == 1
+        return self.send_read_bool_command(ReadCmds.REMOTE_CONTROL_STATUS)
 
     @remote_control_enable.setter
     def remote_control_enable(self, value: bool):
@@ -156,12 +162,16 @@ class GenesisMX:
     @property
     def head(self) -> GenesisMXHeadInfo:
         """Get the laser head information."""
+        try:
+            dio_status = self.send_read_command(ReadCmds.HEAD_DIO_STATUS)
+        except HOPSException:
+            dio_status = "N/A"
         return GenesisMXHeadInfo(
             serial=self.send_read_command(ReadCmds.HEAD_SERIAL),
             type=self.send_read_command(ReadCmds.HEAD_TYPE),
             hours=self.send_read_command(ReadCmds.HEAD_HOURS),
             board_revision=self.send_read_command(ReadCmds.HEAD_BOARD_REVISION),
-            dio_status=self.send_read_command(ReadCmds.HEAD_DIO_STATUS),
+            dio_status=dio_status,
         )
 
     @property
@@ -172,103 +182,92 @@ class GenesisMX:
         return faults
 
     @property
-    def tempurature_metrics(self) -> GenesisMXTempMetrics:
-        return GenesisMXTempMetrics(
-            main = GenesisMXTempMetric(
-                temp=self.temperature_c
-                voltage=self.main_tec_drive_v
-            ),
-            etalon=GenesisMXTempMetric(
-                temp=self.send_read_command(ReadCmds.ETALON_TEMPERATURE),
-                voltage=self.send_read_command(ReadCmds.ETALON_HEATER_DRIVE),
-            ),
-            brf=GenesisMXTempMetric(
-                temp=self.send_read_command(ReadCmds.BRF_TEMPERATURE),
-                voltage=self.send_read_command(ReadCmds.BRF_HEATER_DRIVE),
-            ),
-            shg=GenesisMXTempMetric(
-                temp=self.send_read_command(ReadCmds.SHG_TEMPERATURE),
-                voltage=self.send_read_command(ReadCmds.SHG_HEATER_DRIVE),
-            ),
-        )
-
-
-    @property
-    def temperature_c(self):
+    def temperature_c(self) -> float:
         """
         Get the main temperature of the laser.
 
-        Description: Measures the temperature of the main thermoelectric cooler (TEC) that regulates the overall
-        temperature of the laser head to ensure optimal performance and stability.
+        Description: Measures the temperature of the main thermoelectric cooler (TEC) that regulates
+        the overall temperature of the laser head to ensure optimal performance and stability.
         """
-        return float(self.send_read_command(ReadCmds.MAIN_TEMPERATURE))
+        return self.send_read_float_command(ReadCmds.MAIN_TEMPERATURE)
 
     @property
-    def main_tec_drive_v(self):
+    def main_tec_drive_v(self) -> float:
         """
         Get the main TEC drive voltage of the laser.
 
-        Measures the drive voltage of the main thermoelectric cooler (TEC), which regulates the overall temperature of the laser head.
+        Measures the drive voltage of the main thermoelectric cooler (TEC), which regulates the
+        overall temperature of the laser head.
         """
-        return float(self.send_read_command(ReadCmds.MAIN_TEC_DRIVE))
+        return self.send_read_float_command(ReadCmds.MAIN_TEC_DRIVE)
 
     @property
-    def shg_temperature_c(self):
+    def shg_temperature_c(self) -> float:
         """
         Get the SHG temperature of the laser in degrees Celsius.
 
         Measures the temperature of the Second Harmonic Generation (SHG) heater. The SHG heater is crucial for
-        maintaining the proper temperature for efficient frequency doubling processes that convert the laser light to the desired wavelength.
+        maintaining the proper temperature for efficient frequency doubling processes that convert
+        the laser light to the desired wavelength.
         """
-        return float(self.send_read_command(ReadCmds.SHG_TEMPERATURE))
+        return self.send_read_float_command(ReadCmds.SHG_TEMPERATURE)
 
     @property
-    def shg_heater_drive_v(self):
+    def shg_heater_drive_v(self) -> float:
         """Get the SHG heater drive voltage of the laser."""
-        return float(self.send_read_command(ReadCmds.SHG_HEATER_DRIVE))
+        return self.send_read_float_command(ReadCmds.SHG_HEATER_DRIVE)
 
     @property
-    def brf_temperature_c(self):
+    def brf_temperature_c(self) -> float:
         """
         Get the BRF temperature of the laser in degrees Celsius.
 
         Measures the temperature of the Beam Reference Frequency (BRF) heater. The BRF heater is essential for
         maintaining the proper temperature for the frequency reference of the laser.
         """
-        return float(self.send_read_command(ReadCmds.BRF_TEMPERATURE))
+        return self.send_read_float_command(ReadCmds.BRF_TEMPERATURE)
 
     @property
-    def brf_heater_drive_v(self):
+    def brf_heater_drive_v(self) -> float:
         """Get the BRF heater drive voltage of the laser."""
-        return float(self.send_read_command(ReadCmds.BRF_HEATER_DRIVE))
+        return self.send_read_float_command(ReadCmds.BRF_HEATER_DRIVE)
 
     @property
-    def etalon_temperature_c(self):
+    def etalon_temperature_c(self) -> float:
         """
         Get the etalon temperature of the laser in degrees Celsius.
 
         Measures the temperature of the etalon heater. The etalon heater is crucial for maintaining the proper
         temperature for the etalon, which is used to stabilize the laser wavelength.
         """
-        return float(self.send_read_command(ReadCmds.ETALON_TEMPERATURE))
+        return self.send_read_float_command(ReadCmds.ETALON_TEMPERATURE)
 
     @property
-    def etalon_heater_drive_v(self):
+    def etalon_heater_drive_v(self) -> float:
         """Get the etalon heater drive voltage of the laser."""
-        return float(self.send_read_command(ReadCmds.ETALON_HEATER_DRIVE))
+        return self.send_read_float_command(ReadCmds.ETALON_HEATER_DRIVE)
 
     # Commands
 
-    def send_read_command(self, cmd: ReadCmds):
-        """Send a read command to the laser."""
-        return self.hops.send_command(cmd.value)
-
-    def send_write_command(self, cmd: WriteCmds, value: float = None):
+    def send_write_command(self, cmd: WriteCmds, value: float = None) -> None:
         """Send a write command to the laser."""
         if value is not None:
             self.hops.send_command(f"{cmd.value}{value}")
         else:
             self.send_command(cmd.value)
+
+    def send_read_command(self, cmd: ReadCmds) -> str:
+        """Send a read command to the laser."""
+        return self.hops.send_command(cmd.value)
+
+    def send_read_bool_command(self, cmd: ReadCmds) -> bool:
+        """Send a read command to the laser."""
+        OK = {1, "1"}
+        return self.send_read_command(cmd).strip() in OK
+
+    def send_read_float_command(self, cmd: ReadCmds) -> float:
+        """Send a read command to the laser."""
+        return float(self.send_read_command(cmd).strip())
 
     def close(self) -> None:
         self.power_setpoint_mw = 0

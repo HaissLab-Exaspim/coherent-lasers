@@ -17,7 +17,7 @@ import time
 import logging
 from coherent_lasers.genesis_mx.driver import GenesisMX
 from coherent_lasers.genesis_mx.commands import OperationModes
-from coherent_lasers.hops.lib import HOPSDevice, get_hops_manager
+from coherent_lasers.hops.lib import get_hops_manager
 
 # Setup logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -25,24 +25,53 @@ logger = logging.getLogger(__name__)
 
 
 @click.group()
-def cli():
+def cli() -> None:
     pass
 
+
 @cli.command()
-def list():
+def list() -> None:
     """List serial numbers of all connected devices."""
     manager = get_hops_manager()
-    for device in manager.devices_connected:
-        click.echo(device.serial)
+    for serial in manager._handles.values():
+        click.echo(serial)
+
 
 @cli.command()
 @click.argument("serial")
-@click.argument("command")
+@click.argument("command", default="status -f", required=False)
 @click.option("--interactive", "-i", is_flag=True, help="Start an interactive session with the device.")
-def device(serial, command, interactive):
+@click.option("--send-commands", "-sc", is_flag=True, help="Use command mode for sending low level commands.")
+def device(serial, command, interactive, send_commands) -> None:
     """Send a command to a specific device by serial number or interact with it in an interactive session."""
     device = GenesisMX(serial)
+    exit = {"exit", "EXIT", "quit", "QUIT", ":q", ":Q"}
+
+    if send_commands:
+        click.echo(f"Starting command mode for device {serial}. Type 'exit' to end.")
+        while True:
+            command: str = click.prompt(f"{serial}>", prompt_suffix="")
+            if command in exit:
+                break
+            command.strip().upper()
+            send_command(device, [command])
+
+    if interactive:
+        click.echo(f"Starting interactive session with device {serial}. Type 'exit' to end.")
+        while True:
+            command = click.prompt(f"{serial}>", prompt_suffix="")
+            if command in exit:
+                break
+            handle_command(device, command)
+
+        return
+
+    handle_command(device, command)
+
+
+def handle_command(device: GenesisMX, command: str) -> None:
     handlers = {
+        "send": send_command,
         "enable": enable,
         "disable": disable,
         "info": info,
@@ -51,40 +80,29 @@ def device(serial, command, interactive):
         "status": status,
         "help": display_help,
     }
-    def handle_command(command):
-        parts = command.split()
-        if not parts:
-            return
-        cmd = parts[0]
-        args = parts[1:]
-        if cmd in handlers:
-            try:
-                handlers[cmd](device, args)
-            except Exception as e:
-                click.echo(f"Error executing command: {str(e)}")
-        click.echo("Unknown command. Type 'help' for available commands.")
-
-    if interactive:
-        click.echo(f"Starting interactive session with device {serial}. Type 'exit' to end.")
-        while True:
-            command = click.prompt(f"{serial}>", prompt_suffix="")
-            if command == "exit":
-                break
-            handle_command(command, handlers)
-
+    parts: list[str] = command.split()
+    if not parts:
         return
+    cmd: str = parts[0].lower()
+    if cmd not in handlers:
+        click.echo("Unknown command. Type 'help' for available commands.")
+        return
+    args = parts[1:]
+    try:
+        handlers[cmd](device, args)
+    except Exception as e:
+        click.echo(f"Error executing command: {str(e)}")
 
-    handle_command(command, handlers)
 
-
-def enable(laser: GenesisMX, args):
+def enable(laser: GenesisMX, args=None) -> None:
     """Enable the laser."""
     if args:
-        click.echo(f"The enable command does not take any arguments, ignoring: {args}")
+        click.echo(f"The enable command does not take any arguments, ignoring: {args}", nl=False)
     laser.enable()
     click.echo(f"Laser: {laser.serial} enabled.")
 
-def disable(laser: GenesisMX, args):
+
+def disable(laser: GenesisMX, args=None) -> None:
     """Disable the laser."""
     if args:
         click.echo(f"The disable command does not take any arguments, ignoring: {args}")
@@ -92,29 +110,33 @@ def disable(laser: GenesisMX, args):
     click.echo(f"Laser: {laser.serial} disabled.")
 
 
-def info(laser: GenesisMX, args):
+def info(laser: GenesisMX, args=None) -> None:
     """Display Laser Head information."""
+    click.echo("Laser Head info:")
     if args:
         click.echo(f"The info command does not take any arguments, ignoring: {args}")
-    click.echo("Laser Head Information:")
-    click.echo(f"  Serial: {laser.head.serial}")
-    click.echo(f"  Type: {laser.head.type}")
-    click.echo(f"  Hours: {laser.head.hours}")
-    click.echo(f"  Board Revision: {laser.head.board_revision}")
-    click.echo(f"  DIO Status: {laser.head.dio_status}")
+    try:
+        info = laser.head
+        click.echo(f"  Serial: {info.serial}", nl=False)
+        click.echo(f"  Type: {info.type}", nl=False)
+        click.echo(f"  Hours: {info.hours}", nl=False)
+        click.echo(f"  Board Revision: {info.board_revision}", nl=False)
+        click.echo(f"  DIO Status: {info.dio_status}")
+    except Exception as e:
+        click.echo(f"Error getting information: {str(e)}")
 
 
-def mode(laser: GenesisMX, args):
+def mode(laser: GenesisMX, args=None) -> None:
     """Get or set the laser operation mode."""
     value = args[0] if args else None
     if value is not None:
         if value.upper() in OperationModes.__members__:
             laser.mode = OperationModes[value.upper()]
             click.echo("Updating laser mode...")
-    click.echo(f"  Current mode: {laser.mode.name}, Valid modes: {' | '.join(OperationModes.__members__)}")
+    click.echo(f"  Mode: {laser.mode.name}, Valid modes: {' | '.join(OperationModes.__members__)}")
 
 
-def power(laser: GenesisMX, args):
+def power(laser: GenesisMX, args=[]) -> None:
     """Get or set the laser power."""
     wait = True
     value = None
@@ -132,48 +154,67 @@ def power(laser: GenesisMX, args):
         click.echo("Updating laser power...")
         if wait:
             time.sleep(1)
-    click.echo(f"  Power:          {laser.power_mw:.2f} mW")
-    click.echo(f"  Power Setpoint: {laser.power_setpoint_mw:.2f} mW")
-    click.echo(f"  LDD Current:    {laser.ldd_current:.2f} A")
+    click.echo(f"  Power:             {laser.power_mw:.2f} mW")
+    click.echo(f"  Power Setpoint:    {laser.power_setpoint_mw:.2f} mW")
+    click.echo(f"  LDD Current:       {laser.ldd_current:.2f} A")
     click.echo(f"  LDD Current Limit: {laser.ldd_current_limit:.2f} A")
 
-def status(laser: GenesisMX, args):
+
+def status(laser: GenesisMX, args=None) -> None:
     """Display the current status of the laser."""
     full = "--full" in args or "-f" in args
+    divider = "------------------------------------------------------------------------"
     if full:
+        click.echo(divider)
         info(laser)
-        click.echo(f"  ------------------------------------")
-    click.echo("Laser Status:")
-    click.echo(f"  Enable Loop: {laser.enable_loop}")
+        click.echo(divider)
+    enable_loop = laser.enable_loop
+    click.echo(" Laser Status:")
+    click.echo(f"  Software switch: {enable_loop.software}")
+    click.echo(f"  Key switch: {enable_loop.key}")
+    click.echo(f"  Interlock: {enable_loop.interlock}")
     click.echo(f"  LDD status: {laser.is_ldd_enabled}")
-    click.echo(f"  Temp Metrics: {laser.tempurature_metrics}")
+    click.echo(f"  Temperature: {laser.temperature_c:.2f} C")
     click.echo(f"  Alarms: {', '.join(alarm.name for alarm in laser.alarms)}")
-    click.echo(f"  Analog Input: {laser.analog_input_enable}")
-    click.echo(f"  Remote Control: {laser.remote_control_enable}")
+    # click.echo(f"  Analog Input: {laser.analog_input_enable}")
+    # click.echo(f"  Remote Control: {laser.remote_control_enable}")
     if full:
-        click.echo(f"  ------------------------------------")
+        click.echo(divider)
         mode(laser)
+        click.echo(divider)
         power(laser)
+        click.echo(divider)
 
 
-def display_help(laser: GenesisMX, args):
+def send_command(laser: GenesisMX, args=None) -> None:
+    """Send a command to the laser."""
+    if not args:
+        click.echo("No command provided.")
+        return
+    command = args[0]
+    response = laser.hops.send_command(command)
+    click.echo(f"Response: {response}")
+
+
+def display_help(laser: GenesisMX, args=None) -> None:
     """Display available commands."""
     py_doc = "--full" in args or "-f" in args
 
     if laser is not None:
         click.echo(f"Available commands for laser {laser.serial}:")
     click.echo("Available commands:")
+    click.echo("  --interactive, -i - Start an interactive session with the device")
+    click.echo("      exit - End the interactive session")
     click.echo("  enable - Enable the laser")
     click.echo("  disable - Disable the laser")
     click.echo("  info - Display Laser Head information")
     click.echo("  mode [value] - Get or set the laser operation mode")
     click.echo("  power [value] [-nw|--no-wait] - Get or set the laser power")
+    click.echo("  send [command] - Send a command to the laser")
     click.echo("  status [-f|--full] - Display the current status of the laser")
     click.echo("  help - Display this help message")
-    click.echo("  exit - End the interactive session")
     if py_doc:
         click.echo(__doc__)
-
 
 
 class LaserException(Exception):
@@ -196,6 +237,7 @@ def handle_laser_exceptions(func):
             logger.exception(f"Unexpected error in {func.__name__}")
 
     return wrapper
+
 
 @cli.command()
 @click.option("--duration", default=60, help="Duration of the test in seconds")
