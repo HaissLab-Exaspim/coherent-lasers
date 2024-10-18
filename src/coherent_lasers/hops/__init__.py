@@ -12,9 +12,9 @@ import platform
 import sys
 
 # Ensure is windows
-if not (sys.platform.startswith("win") and platform.machine().endswith("64")):
-    raise OSError("This package only supports 64-bit Windows systems.")
+# if not (sys.platform.startswith("win") and platform.machine().endswith("64")):
+#     raise OSError("This package only supports 64-bit Windows systems.")
 
-from .main import HOPSDevice
+from .lib import HOPSDevice
 
 __all__ = ["HOPSDevice"]

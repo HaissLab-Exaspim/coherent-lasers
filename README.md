@@ -8,7 +8,7 @@ communication with the devices, the drivers utilize:
 
 ## Supported Lasers
 
-1. [Genesis MX](src/coherent_lasers/genesis_mx/README.md)
+1. [Genesis MX](#genesis-mx-laser-series-driver)
 
 Repository is organized by laser model. Each laser model has its own directory containing the driver code.
 
@@ -41,3 +41,14 @@ pip install https://github.com/AllenNeuralDynamics/coherent_lasers/releases/down
 ```
 
 **Note**: Replace v0.1.0 with the tag of the release you want to install.
+
+## Genesis MX Laser Series Driver
+
+A minimal python driver for a Genesis MX laser
+
+Provides two classes for controlling a Coherent Genesis MX laser.
+
+1. The `GenesisMX` class provides a comprehensive API for controlling the laser.
+2. The `GenesisMXVoxelLaser` class provides a simplified API for controlling the laser based on the requirements of the [Voxel](https://github.com/AllenNeuralDynamics/voxel/) library.
+
+Supports connection via USB using the HOPS SDK provided by Coherent.

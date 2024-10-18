@@ -31,6 +31,7 @@ dev = [
 ]
 
 [project.scripts]
+cohrhops = "coherent_lasers.hops.app:cli"
 genesis-mx = "coherent_lasers.genesis_mx.app:cli"
 
 [tool.setuptools]

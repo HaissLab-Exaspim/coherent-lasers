@@ -12,7 +12,7 @@ logger.setLevel(logging.ERROR)
 DLL_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # Add the DLL directory to the DLL search path
-os.add_dll_directory(DLL_DIR)
+# os.add_dll_directory(DLL_DIR)
 
 # Add the DLL directory to the system PATH
 os.environ["PATH"] = DLL_DIR + os.pathsep + os.environ["PATH"]
@@ -78,7 +78,8 @@ class HOPSManager:
         self._devices_removed = HOPSDevicesList()
         self._number_of_devices_removed = C.c_ulong()
 
-        self._refresh_devices()
+        self._fetch_device_connection_info()
+        self._activate_all_devices()
 
     def initialize_device(self, serial: str) -> COHRHOPS_HANDLE:
         self._active_serials.add(serial)
@@ -107,7 +108,7 @@ class HOPSManager:
             raise Exception(f"Error getting DLL version: {res}")
 
     def __del__(self) -> None:
-        self._refresh_devices()
+        self._fetch_device_connection_info()
         for i in range(self._number_of_devices_connected.value):
             handle = self._devices_connected[i]
             self._close(handle)
@@ -133,8 +134,8 @@ class HOPSManager:
         self._check_for_devices.argtypes = [LPULPTR, LPDWORD, LPULPTR, LPDWORD, LPULPTR, LPDWORD]
         self._check_for_devices.restype = int
 
-    def _refresh_devices(self):
-        self._log.debug("Starting device refresh")
+    def _fetch_device_connection_info(self):
+        self._log.debug("Updating devices info...")
         res = self._check_for_devices(
             self._devices_connected.pointer(),
             C.byref(self._number_of_devices_connected),
@@ -145,23 +146,35 @@ class HOPSManager:
         )
         if res != COHRHOPS_OK:
             raise HOPSException(f"Error checking for devices: {res}")
+        self.log.debug(f"Updated devices info. Connected: {self._number_of_devices_connected.value}")
 
-        self._log.debug(f"Refresh complete. Connected: {self._number_of_devices_connected.value}")
-
+    def _activate_all_devices(self):
+        self._log.debug("Activating all devices...")
         connected_handles = {self._devices_connected[i] for i in range(self._number_of_devices_connected.value)}
+        for handle in connected_handles:
+            self._initialize_device_by_handle(handle)
+            ser = self._get_device_serial(handle)
+            self._handles[handle] = ser
+            self._active_serials.add(ser)
+        self._log.debug("Registered Handles: " + str(self._handles))
+        self._log.debug("Active Devices: " + str(self._active_serials))
 
-        # Clean up handles in self._handles that are no longer connected, might be unnecessary
-        current_handles = set(self._handles.keys())
-        for handle in current_handles:
-            if handle not in connected_handles:
-                del self._handles[handle]
-
+    def _validate_active_devices(self):
+        self.log.debug("Validating active devices...")
+        connected_handles = {self._devices_connected[i] for i in range(self._number_of_devices_connected.value)}
         for handle in connected_handles:
             self._initialize_device_by_handle(handle)
             ser = self._get_device_serial(handle)
             self._handles[handle] = ser
             if ser not in self._active_serials:
                 self._close_device_by_handle(handle)
+        self._handles = {handle: ser for handle, ser in self._handles.items() if ser in self._active_serials}
+        self._log.debug("Registered Handles: " + str(self._handles))
+        self._log.debug("Active Devices: " + str(self._active_serials))
+
+    def _refresh_devices(self):
+        self._fetch_device_connection_info()
+        self._validate_active_devices()
 
     def _get_device_serial(self, handle: COHRHOPS_HANDLE) -> str:
         response = C.create_string_buffer(MAX_STRLEN)
@@ -202,7 +215,6 @@ class HOPSDevice:
 
     def __init__(self, serial: str):
         self.serial = serial
-        self._handle = self._manager.initialize_device(self.serial)
 
     def send_command(self, command: str) -> str:
         return self._manager.send_device_command(self.serial, command)

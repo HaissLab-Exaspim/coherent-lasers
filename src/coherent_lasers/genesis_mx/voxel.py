@@ -41,7 +41,7 @@ class GenesisMXVoxelLaser(BaseLaser):
 
     @power_setpoint_mw.setter
     def power_setpoint_mw(self, value: float):
-        self._inst.power_setpoint_mw = value
+        self._inst.power_mw = value
 
     @property
     def temperature_c(self) -> float:
