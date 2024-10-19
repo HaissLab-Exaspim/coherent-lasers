@@ -36,11 +36,9 @@ Repository is organized by laser model. Each laser model has its own directory c
 You can install the `coherent_lasers` package directly from a GitHub release using `pip`.
 
 ```bash
-cohrhops_version=0.1.0
-pip install https://github.com/AllenNeuralDynamics/coherent_lasers/releases/download/v${cohrhops_version}/coherent_lasers-${cohrhops_version}-py3-none-any.whl
+coherent_version=0.1.0
+pip install https://github.com/AllenNeuralDynamics/coherent_lasers/releases/download/v${coherent_version}/coherent_lasers-${coherent_version}-py3-none-any.whl
 ```
-
-**Note**: Replace v0.1.0 with the tag of the release you want to install.
 
 ## Genesis MX Laser Series Driver
 
@@ -52,3 +50,28 @@ Provides two classes for controlling a Coherent Genesis MX laser.
 2. The `GenesisMXVoxelLaser` class provides a simplified API for controlling the laser based on the requirements of the [Voxel](https://github.com/AllenNeuralDynamics/voxel/) library.
 
 Supports connection via USB using the HOPS SDK provided by Coherent.
+
+## Usage
+
+Lasers such as the Genesis MX series require that the HOPS dll files are installed and configured properly. (_HOPS dependent lasers only work on Windows._)
+
+Installing this package from the .whl file will include the necessary dependencies. Otherwise you will need to download the dll files and add them to your system path.
+
+Once installed, you can test the driver using the following command:
+
+```shell
+cohrhops list                                   # List available HOPS devices
+cohrhops device <serial_number>                 # Connect to a specific device
+cohrhops device <serial_number> --interactive   # To interact with a device in a REPL
+cohrhops device <serial_number> --i             # Same as above
+```
+
+For the `GenesisMX` lasers you can use a more abstracted cli by running the following command:
+
+```shell
+genesis-mx list                                   # List available Genesis MX devices
+genesis-mx device <serial_number>                 # Connect to a specific Genesis MX device
+genesis-mx device <serial_number> --interactive   # To interact with a Genesis MX device in a REPL
+genesis-mx device <serial_number> --i             # Same as above
+genesis-mx --help                                  # Show help for the genesis-mx command
+```
