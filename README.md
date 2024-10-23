@@ -36,11 +36,9 @@ Repository is organized by laser model. Each laser model has its own directory c
 You can install the `coherent_lasers` package directly from a GitHub release using `pip`.
 
 ```bash
-cohrhops_version=0.1.0
-pip install https://github.com/AllenNeuralDynamics/coherent_lasers/releases/download/v${cohrhops_version}/coherent_lasers-${cohrhops_version}-py3-none-any.whl
+coherent_version=0.1.0
+pip install https://github.com/AllenNeuralDynamics/coherent_lasers/releases/download/v${coherent_version}/coherent_lasers-${coherent_version}-py3-none-any.whl
 ```
-
-**Note**: Replace v0.1.0 with the tag of the release you want to install.
 
 ## Genesis MX Laser Series Driver
 
@@ -54,6 +52,12 @@ Provides two classes for controlling a Coherent Genesis MX laser.
 Supports connection via USB using the HOPS SDK provided by Coherent.
 
 ## Usage
+
+Lasers such as the Genesis MX series require that the HOPS dll files are installed and configured properly. (_HOPS dependent lasers only work on Windows._)
+
+Installing this package from the .whl file will include the necessary dependencies. Otherwise you will need to download the dll files and add them to your system path.
+
+Once installed, you can test the driver using the following commands
 
 For a simple command line interface to send commands to a hops device, you can run the following command:
 
