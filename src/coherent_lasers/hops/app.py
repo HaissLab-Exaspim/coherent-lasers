@@ -1,47 +1,71 @@
 """
 Simple cli app for sending commands to a CohrHOPS device.
-Two main commands are available:
-- list: list serial numbers of all connected devices
-- device: send a command to a specific device by serial number or interact with it in an interactive session
 """
 
 import click
 from .lib import HOPSException, get_hops_manager, HOPSDevice
 
 
-@click.group()
-def cli() -> None:
-    pass
-
-
-@cli.command()
-def list():
-    """List serial numbers of all connected devices."""
+@click.command()
+@click.option("--command", "-c", help="Send a commmand to all devices")
+def cli(command) -> None:
     manager = get_hops_manager()
-    for serial in manager._handles.values():
-        click.echo(serial)
+    serials = manager._handles.values()
+    devices = {serial: HOPSDevice(serial) for serial in serials}
+    click.echo(f"Found {len(serials)} devices:")
+    for serial in serials:
+        click.echo(f"  {serial}:")
+    if command:
+        click.echo(f"Sending command to all devices: {command}")
+        for serial, device in devices.items():
+            click.echo(f" {serial}: {device.send_command(command)}")
+        return
+    multidevice_interactive_session(devices)
 
 
-@cli.command()
-@click.argument("serial")
-@click.argument("command", default="*?HID", required=False)
-@click.option("--interactive", "-i", is_flag=True, help="Start an interactive session with the device.")
-def device(serial, command, interactive) -> None:
-    """Send a command to a specific device by serial number or interact with it in an interactive session."""
-    exit = {"exit", "EXIT", "quit", "QUIT", "q", "Q"}
-    device = HOPSDevice(serial)
-    if interactive:
-        click.echo(f"Starting interactive session with device {serial}. Type 'exit' to end.")
-        while True:
-            command = click.prompt(f"{serial}>", prompt_suffix="")
-            if command in exit:
-                break
-            try:
-                click.echo(device.send_command(command), nl=False)
-            except HOPSException as e:
-                click.echo(f"HOPSError: {e}")
-    else:
-        click.echo(device.send_command(command), nl=False)
+def multidevice_interactive_session(devices: dict) -> None:
+    EXIT = {"EXIT", "QUIT", ":Q"}
+    LIST = {"LIST", "LS"}
+    devices = devices
+    current = [next(iter(devices.keys()))]
+    click.echo(f"starting interactive session with devices: {', '.join(devices.keys())}. Type 'exit' to end.")
+    while True:
+        command: str = click.prompt(f"{', '.join(current)}>", prompt_suffix="")
+        command_parts = command.split()
+        primary_command = command_parts[0].upper()
+        if primary_command in EXIT:
+            break
+        if primary_command in LIST:
+            click.echo(f"Found {len(devices)} devices:")
+            for serial in devices:
+                click.echo(f"  {serial}:")
+            continue
+        if primary_command.startswith("SELECT"):
+            if len(command_parts) < 2:
+                click.echo("Please provide a device to switch to. Either by index or serial number.")
+                continue
+            current = parse_select_command(command, devices)
+            continue
+        try:
+            for serial in current:
+                click.echo(f"  {serial}: {devices[serial].send_command(command)}")
+        except HOPSException as e:
+            click.echo(f"HOPSError: {e}")
+
+
+def parse_select_command(command: str, devices: dict) -> list:
+    command_parts = command.upper().split()
+    if "ALL" in command_parts:
+        return list(devices.keys())
+    selected = []
+    for arg in command_parts:
+        if arg.isdigit() and int(arg) <= len(devices):
+            selected.append(list(devices.keys())[int(arg) - 1])
+            continue
+        if arg in devices:
+            selected.append(arg)
+            continue
+    return selected
 
 
 if __name__ == "__main__":

@@ -52,3 +52,17 @@ Provides two classes for controlling a Coherent Genesis MX laser.
 2. The `GenesisMXVoxelLaser` class provides a simplified API for controlling the laser based on the requirements of the [Voxel](https://github.com/AllenNeuralDynamics/voxel/) library.
 
 Supports connection via USB using the HOPS SDK provided by Coherent.
+
+## Usage
+
+For a simple command line interface to send commands to a hops device, you can run the following command:
+
+```bash
+cohrhops
+```
+
+Alternatively, run the following command to interact with connected Genesis MX lasers:
+
+```bash
+genesis-mx
+```

@@ -95,11 +95,11 @@ class HOPSManager:
 
     def send_device_command(self, serial: str, command: str) -> str:
         handle = next(handle for handle, ser in self._handles.items() if ser == serial)
-        response = C.create_string_buffer(MAX_STRLEN)
+        response: str = C.create_string_buffer(MAX_STRLEN)
         res = self._send_command(handle, command.encode(), response)
         if res != COHRHOPS_OK:
             raise HOPSException(f"Error sending command to device {serial}", res)
-        return response.value.decode("utf-8")
+        return response.value.decode("utf-8").strip()
 
     @property
     def version(self) -> str:

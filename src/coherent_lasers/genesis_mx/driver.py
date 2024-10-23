@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from enum import StrEnum
 import logging
 from coherent_lasers.genesis_mx.commands import ReadCmds, WriteCmds, OperationModes, Alarms
 from coherent_lasers.hops import HOPSDevice
@@ -28,6 +29,15 @@ class GenesisMXHeadInfo:
     dio_status: str
 
 
+class GenesisMXHeadType(StrEnum):
+    """Head types for Genesis MX lasers.
+    - used in determining the unit factor for power readings and write commands.
+    """
+
+    MINIX = "MiniX"
+    MINI00 = "Mini00"
+
+
 @dataclass(frozen=True)
 class GenesisMXEnableLoop:
     software: bool
@@ -53,6 +63,14 @@ class GenesisMX:
         self.hops = HOPSDevice(self.serial)
         if not self.hops:
             raise ValueError(f"Failed to initialize laser with serial number {self.serial}")
+        self.disable()
+        self._unit_factor = 1
+        if self.head.type == GenesisMXHeadType.MINIX:
+            self._unit_factor = 1000
+        try:
+            self.remote_control_enable = True
+        except HOPSException:
+            self.log.debug("Failed to enable remote control. Remote control may be disabled.")
 
     @property
     def mode(self) -> OperationModes:
@@ -68,11 +86,12 @@ class GenesisMX:
     @property
     def power_mw(self) -> float:
         """Get the current power of the laser."""
-        return self.send_read_float_command(ReadCmds.POWER)
+        return self.send_read_float_command(ReadCmds.POWER) * self._unit_factor
 
     @power_mw.setter
     def power_mw(self, value: float) -> None:
         """Set the power of the laser."""
+        value = value / self._unit_factor
         self.send_write_command(WriteCmds.SET_POWER, value)
         if not self.enable_loop.enabled:
             self.log.warning(f"Attempting to set power to {value} mW while laser is disabled.")
@@ -80,7 +99,7 @@ class GenesisMX:
     @property
     def power_setpoint_mw(self) -> float:
         """Get the current power setpoint of the laser."""
-        return float(self.send_read_command(ReadCmds.POWER_SETPOINT))
+        return float(self.send_read_command(ReadCmds.POWER_SETPOINT)) * self._unit_factor
 
     @property
     def ldd_current(self) -> float:
