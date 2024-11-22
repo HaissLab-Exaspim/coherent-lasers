@@ -110,11 +110,11 @@ class HOPSManager:
         else:
             raise Exception(f"Error getting DLL version: {res}")
 
-    def __del__(self) -> None:
-        self._fetch_device_connection_info()
-        for i in range(self._number_of_devices_connected.value):
-            handle = self._devices_connected[i]
-            self._close(handle)
+    # def __del__(self) -> None:
+    #     self._fetch_device_connection_info()
+    #     for i in range(self._number_of_devices_connected.value):
+    #         handle = self._devices_connected[i]
+    #         self._close(handle)
 
     def _wrap_functions(self):
         self._initialize_handle = self._dll.CohrHOPS_InitializeHandle
