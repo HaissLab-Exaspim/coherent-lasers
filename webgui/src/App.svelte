@@ -4,9 +4,9 @@
   import * as d3 from "d3";
   import { laserPowerChart } from "./powerChart.svelte";
   import { Laser, type Wavelength } from "./laser.svelte";
-  import DeliminatedInput from "./lib/components/DeliminatedInput.svelte";
+  import DeliminatedInput from "#lib/components/DeliminatedInput.svelte";
+  import { API_BASE } from "#lib/constants";
 
-  const API_BASE: string = "http://localhost:8000/api";
   const MIN_POWER = 0;
 
   // State
@@ -205,33 +205,29 @@
         <div class="power-value property">
           <h3>Power</h3>
           <p>
-            <span>{laser.power.value?.toFixed(2) ?? "--"} </span><small
-              >mW</small
-            >
+            <span>{laser.power.value?.toFixed(2) ?? "--"} </span>
+            <small>mW</small>
           </p>
         </div>
         <div class="power-setpoint property">
           <h3>Setpoint</h3>
           <p>
-            <span>{laser.power.setpoint?.toFixed(2) ?? "--"} </span><small
-              >mW</small
-            >
+            <span>{laser.power.setpoint?.toFixed(2) ?? "--"} </span>
+            <small>mW</small>
           </p>
         </div>
         <div class="current property">
           <h3>Current</h3>
           <p>
-            <span>{laser.status?.current?.toFixed(2) ?? "--"} </span><small
-              >A</small
-            >
+            <span>{laser.status?.current?.toFixed(2) ?? "--"} </span>
+            <small>A</small>
           </p>
         </div>
         <div class="temperature property">
           <h3>Temp</h3>
           <p>
-            <span>{laser.status?.temperature?.toFixed(2) ?? "--"} </span><small
-              >℃</small
-            >
+            <span>{laser.status?.temperature?.toFixed(2) ?? "--"} </span>
+            <small>℃</small>
           </p>
         </div>
       </div>
@@ -312,17 +308,15 @@
       <p>Loading devices...</p>
     {:else if lasers.length === 0}
       <p>No devices found. Try Refreshing to discover devices.</p>
-      <form onsubmit={(e) => e.preventDefault()}>
+      <div class="start-form">
         <div class="input-group">
           <label for="use-mock-devices">Use Mock Devices</label>
           <input type="checkbox" id="use-mock-devices" bind:checked={useMock} />
         </div>
-        <button
-          class="app-input refresh-btn"
-          type="submit"
-          onclick={() => fetchLasers()}>Find Devices</button
-        >
-      </form>
+        <button class="app-input refresh-btn" onclick={() => fetchLasers()}>
+          Find Devices
+        </button>
+      </div>
     {:else}
       <div class="laser-cards">
         {#each lasers as laser}
@@ -429,7 +423,7 @@
   .main-panel {
     margin-block: 1rem;
     height: 100%;
-    > form {
+    > .start-form {
       display: flex;
       flex-direction: column;
       width: clamp(16rem, 30vw, 23rem);
@@ -646,7 +640,7 @@
           --border-size: 1.5px;
           --height: 2rem;
         }
-        /* input, */
+
         button {
           color: var(--zinc-50);
           font-size: var(--font-md);
@@ -655,21 +649,7 @@
           border-radius: 0.25rem;
           border: 1px solid var(--color);
         }
-        /* input {
-          --color: var(--yellow-400);
-          background-color: var(--zinc-900);
-          text-align: center;
-          transition: border-color 0.3s;
-          &:hover,
-          &:focus {
-            --color: var(--yellow-600);
-          }
-          &:disabled {
-            background-color: var(--zinc-900);
-            cursor: not-allowed;
-            opacity: 0.5;
-          }
-        } */
+
         button {
           cursor: pointer;
           user-select: none;

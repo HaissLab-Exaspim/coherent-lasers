@@ -1,5 +1,6 @@
 import logging
 from pathlib import Path
+import socket
 
 import uvicorn
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
@@ -7,17 +8,23 @@ from fastapi.concurrency import asynccontextmanager, run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+from uvicorn.logging import DefaultFormatter
 
-# Import your GenesisMX class and HOPS manager factory.
 from coherent_lasers.genesis_mx import GenesisMX, GenesisMXMock
 from coherent_lasers.genesis_mx.hops import get_cohrhops_manager
 
 from .messaging import MessageEnvelope, PeriodicTask, PubSubHub, WebSocketHub
 
-logger = logging.getLogger("laser_api")
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+# logger = logging.getLogger("laser_api")
+# logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
-pub_sub_hub = WebSocketHub()
+logger = logging.getLogger("app")
+logger.setLevel(logging.INFO)
+
+console_handler = logging.StreamHandler()
+console_handler.setFormatter(DefaultFormatter(fmt="%(levelprefix)s %(message)s", use_colors=True))
+
+logger.addHandler(console_handler)
 
 
 # -----------------------------------------------------------------------------
@@ -132,9 +139,9 @@ class DeviceState:
 
 class ApplicationState:
     def __init__(self, publisher: PubSubHub):
-        self.publisher = pub_sub_hub
+        self.publisher = publisher
         self.devices: dict[str, DeviceState] = {}
-        self.logger = logging.getLogger("app_state")
+        self.logger = logging.getLogger("app.state")
 
     @property
     def serials(self) -> list[str]:
@@ -181,7 +188,7 @@ class ApplicationState:
 
 
 # initialize the global app state
-state = ApplicationState(pub_sub_hub)
+state = ApplicationState(WebSocketHub())
 
 
 @asynccontextmanager
@@ -195,10 +202,11 @@ app = FastAPI(title="Laser Control API", version="0.1", lifespan=lifespan)
 app.add_middleware(
     middleware_class=CORSMiddleware,
     allow_origins=[
+        "http://localhost",
         "http://localhost:5173",
-        "http://localhost:4173",
-        "http://127.0.0.1:8000",
-        "http://0.0.0.0:8000",
+        "http://127.0.0.1",
+        "http://0.0.0.0",
+        "*",
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -279,7 +287,7 @@ async def set_power(serial: str, request: SetPowerRequest):
 # ----------------------------------------------------------------------------------------------------------------------
 @app.websocket("/ws")
 async def shared_ws(websocket: WebSocket):
-    conn = await pub_sub_hub.connect(websocket)
+    conn = await state.publisher.connect(websocket)
     try:
         while True:
             # Expect subscription messages, e.g., {"subscribe": ["device123", "device456"], "unsubscribe": ["device789"]}
@@ -296,10 +304,10 @@ async def shared_ws(websocket: WebSocket):
                         logger.info(f"Client unsubscribed from topic: {topic}")
     except WebSocketDisconnect:
         logger.info("Shared websocket disconnected.")
-        pub_sub_hub.disconnect(conn)
+        state.publisher.disconnect(conn)
     except Exception as e:
         logger.error(f"Shared websocket error: {e}")
-        pub_sub_hub.disconnect(conn)
+        state.publisher.disconnect(conn)
 
 
 # -----------------------------------------------------------------------------
@@ -309,9 +317,48 @@ frontend_build_dir = Path(__file__).parent / "frontend" / "build"
 app.mount("/", StaticFiles(directory=frontend_build_dir, html=True), name="app")
 
 
+# -----------------------------------------------------------------------------
+def get_local_ip():
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        # The address doesn't need to be reachable; it's used to determine the local IP.
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+    except Exception:
+        ip = "127.0.0.1"
+    finally:
+        s.close()
+    return ip
+
+
+class Settings:
+    host: str = "0.0.0.0"
+    port: int = 80
+    ip: str = get_local_ip()
+
+
+class AnsiColors:
+    HEADER = "\033[95m"
+    OKBLUE = "\033[94m"
+    OKCYAN = "\033[96m"
+    OKGREEN = "\033[92m"
+    WARNING = "\033[93m"
+    FAIL = "\033[91m"
+    ENDC = "\033[0m"
+    BOLD = "\033[1m"
+    UNDERLINE = "\033[4m"
+
+
+settings = Settings()
+
+
 def run():
     try:
-        uvicorn.run(app, log_level="info")
+        logger.info(
+            f"Application will be available at: "
+            f"{AnsiColors.OKBLUE}http://{settings.ip}:{settings.port}{AnsiColors.ENDC}"
+        )
+        uvicorn.run(app, host=settings.host, port=settings.port, log_level="info")
     except KeyboardInterrupt:
         print("Shutdown requested. Exiting...")
 
@@ -319,6 +366,10 @@ def run():
 if __name__ == "__main__":
     module_name = Path(__file__).stem
     try:
-        uvicorn.run(f"{module_name}:app", host="0.0.0.0", port=8000, reload=False)
+        logger.info(
+            f"Application will be available at: "
+            f"{AnsiColors.OKBLUE}http://{settings.ip}:{settings.port}{AnsiColors.ENDC}"
+        )
+        uvicorn.run(f"{module_name}:app", host=settings.host, port=settings.port, reload=False)
     except KeyboardInterrupt:
         logger.info("KeyboardInterrupt received. Shutting down.")
