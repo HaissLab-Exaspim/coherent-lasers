@@ -1,24 +1,24 @@
-[build-system]
-requires = ["setuptools", "setuptools-scm"]
-build-backend = "setuptools.build_meta"
-
 [project]
 name = "coherent_lasers"
+version =  "0.2.0"
 description = "A python package for controlling coherent lasers"
 license = { text = "MIT" }
-requires-python = ">=3.10"
+requires-python = ">=3.10, < 3.12"
 authors = [
     { name = "Walter Mwaniki", email = "walter.mwaniki@alleninstitute.org" },
 ]
 classifiers = ["Programming Language :: Python :: 3.10"]
 readme = "README.md"
 keywords = ["laser", "coherent", "drivers", "hardware control"]
-dynamic = ["version"]
+
+[build-system]
+requires = ["setuptools>=42", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
 
 dependencies = []
 
 [project.optional-dependencies]
-voxel = ["voxel @ git+https://github.com/AllenNeuralDynamics/voxel.git"]
+gui = ["fastapi[standard]", "uvicorn", "click>=8.1.7"]
 dev = [
     'pytest',
     'black',
@@ -29,27 +29,67 @@ dev = [
     'Sphinx',
     'furo',
 ]
-
-[project.scripts]
-cohrhops = "coherent_lasers.hops.app:cli"
-genesis-mx = "coherent_lasers.genesis_mx.app:cli"
+build = ["setuptools>=42", "setuptools-scm"]
 
 [tool.setuptools]
 package-dir = { "" = "src" }
 include-package-data = true
 py-modules = []
 
+[project.scripts]
+genesis-mx = "coherent_lasers.app.server:run"
+genesis-mx-cli = "coherent_lasers.app.cli:cli"
+
 [tool.setuptools.package-data]
-"coherent_lasers.common.hops" = ["CohrFTCI2C.dll", "CohrHOPS.dll"]
+"coherent_lasers.genesis_mx.hops" = ["CohrFTCI2C.dll", "CohrHOPS.dll"]
+"coherent_lasers.app.frontend" = ["build/*"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
 include = ["coherent_lasers*"]
+# exclude = ["tests*, docs*, webgui*, dist*, frontend*, build*"]
 namespaces = false
 
+[tool.ruff]
+line-length = 120
+show-fixes = true
 
-[tool.setuptools.dynamic]
-version = { attr = "coherent_lasers.__version__" }
+target-version = "py311"
+
+exclude = [
+    ".bzr",
+    ".direnv",
+    ".eggs",
+    ".git",
+    ".gitignore",
+    ".git-rewrite",
+    ".hg",
+    ".ipynb_checkpoints",
+    ".mypy_cache",
+    ".nox",
+    ".pants.d",
+    ".pyenv",
+    ".pytest_cache",
+    ".pytype",
+    ".ruff_cache",
+    ".svn",
+    ".tox",
+    ".venv",
+    ".vscode",
+    "__pypackages__",
+    "_build",
+    "buck-out",
+    "build",
+    "dist",
+    "node_modules",
+    "site-packages",
+    "venv",
+    "sdk",
+]
+
+[tool.ruff.lint]
+extend-select = ["C4", "SIM", "TCH"]
+fixable = ["ALL"]
 
 [tool.black]
 line-length = 120

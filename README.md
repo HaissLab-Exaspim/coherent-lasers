@@ -1,72 +1,114 @@
 # coherent_lasers
 
-This repository contains python driver packages for various lasers manufactured by coherent. To facilitate
-communication with the devices, the drivers utilize:
+Python drivers for Coherent lasers.
 
-1. low level SDKs provided by coherent
-2. Serial communication via `RS232` and equivalent protocols
-
-## Supported Lasers
-
-1. [Genesis MX](#genesis-mx-laser-series-driver)
+## Project Overview
 
 Repository is organized by laser model. Each laser model has its own directory containing the driver code.
 
    ```text
    coherent_lasers/
    ├── src/
-   │   ├── common/
+   │   ├── app/
+   │   │   ├── frontend/build/(build files from webgui)
+   │   │   ├── messaging/
+   │   │   ├── cli.py
+   │   │   ├── server.py
+   │   ├── genesis_mx/
+   │   │   ├── commands.py
+   │   │   ├── mock.py
+   │   │   └── driver.py
    │   │   ├── hops/
    │   │   │   ├── CohrFTCI2C.h
    │   │   │   ├── CohrHOPS.h
    │   │   │   ├── (DLL files for each .h file)
-   │   │   │   ├── manager.py
-   │   │   │   └── device.py
-   │   │   ├── serial/
-   │   │   │   └── serial_device.py
-   │   ├── genesis_mx/
-   │   │   ├── genesis_mx.py
-   │   │   ├── genesis_mx_voxel.py
-   │   │   └── README.md
-   └── setup.py
+   │   │   │   ├── lib.py
+   ├── setup.py
+   └── webgui (web frontend for controlling the laser)
    ```
 
-## Installation
+### Supported Lasers
 
-You can install the `coherent_lasers` package directly from a GitHub release using `pip`.
-
-```bash
-coherent_version=0.1.0
-pip install https://github.com/AllenNeuralDynamics/coherent_lasers/releases/download/v${coherent_version}/coherent_lasers-${coherent_version}-py3-none-any.whl
-```
-
-## Genesis MX Laser Series Driver
-
-A minimal python driver for a Genesis MX laser
-
-Provides two classes for controlling a Coherent Genesis MX laser.
-
-1. The `GenesisMX` class provides a comprehensive API for controlling the laser.
-2. The `GenesisMXVoxelLaser` class provides a simplified API for controlling the laser based on the requirements of the [Voxel](https://github.com/AllenNeuralDynamics/voxel/) library.
-
-Supports connection via USB using the HOPS SDK provided by Coherent.
+1. [Genesis MX](https://www.coherent.com/lasers/cw-solid-state/genesis)
+   The `GenesisMX` class provides a comprehensive API for controlling the laser.
+   Supports connection via USB using the HOPS SDK provided by Coherent.
 
 ## Usage
 
-Lasers such as the Genesis MX series require that the HOPS dll files are installed and configured properly. (_HOPS dependent lasers only work on Windows._)
+>: **Note:** Installing the package from a wheel file will ensure that the necessary dll files are included. If you install the package from source, you will need to download the dll files and add them to the `src/coherent_lasers/src/hops` directory.
 
-Installing this package from the .whl file will include the necessary dependencies. Otherwise you will need to download the dll files and add them to your system path.
+### Running from a wheel file
 
-Once installed, you can test the driver using the following commands
-
-For a simple command line interface to send commands to a hops device, you can run the following command:
+Download the latest release from the [releases page](https://github.com/AllenNeuralDynamics/coherent_lasers/releases).
 
 ```bash
-cohrhops
+pip install <path_to_downloaded_wheel>
 ```
 
-Alternatively, run the following command to interact with connected Genesis MX lasers:
+Alternatively you can install the `coherent_lasers` package directly from a GitHub release using `pip`.
+
+```bash
+coherent_version=0.2.0
+pip install https://github.com/AllenNeuralDynamics/coherent_lasers/releases/download/v${coherent_version}/coherent_lasers-${coherent_version}-py3-none-any.whl
+```
+
+To launch a web GUI for controlling the laser, run the following command:
 
 ```bash
 genesis-mx
+```
+
+### Running from source
+
+```bash
+git clone
+```
+
+```bash
+cd coherent_lasers
+```
+
+```bash
+uv sync
+```
+
+```bash
+cd webgui && pnpm i && pnpm run build && cd ..
+```
+
+```bash
+genesis-mx
+```
+
+alternatively, you can run the server using fastapi cli:
+
+```bash
+cd src/coherent_lasers/app
+
+```bash
+uv run fastapi dev server.py
+```
+
+### Building the Web GUI
+
+```bash
+cd webgui
+```
+
+> **Note:** You can also use `npm` or `yarn` in place of `pnpm` below, to install the dependencies and build the project.
+
+```bash
+pnpm i
+```
+
+```bash
+pnpm run build
+```
+
+```bash
+cd ../src/coherent_lasers/app
+```
+
+```bash
+uv run fastapi dev server.py
 ```
