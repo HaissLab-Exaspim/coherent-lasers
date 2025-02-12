@@ -61,7 +61,7 @@ genesis-mx
 ### Running from source
 
 ```bash
-git clone
+git clone git@github.com:AllenNeuralDynamics/coherent-lasers.git
 ```
 
 ```bash
