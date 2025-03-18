@@ -8,13 +8,6 @@ Setup:
 2. Place the DLL files in this package alongside the respective .h files.
 """
 
-import platform
-import sys
+from .cohrhops import CohrHOPSDevice, CohrHOPSManager, HOPSException, get_cohrhops_manager
 
-# Ensure is windows
-# if not (sys.platform.startswith("win") and platform.machine().endswith("64")):
-#     raise OSError("This package only supports 64-bit Windows systems.")
-
-from .lib import HOPSDevice
-
-__all__ = ["HOPSDevice"]
+__all__ = ["CohrHOPSDevice", "CohrHOPSManager", "HOPSException", "get_cohrhops_manager"]
