@@ -24,7 +24,7 @@ class HOPSDevice:
         self._manager = hops_manager
 
     def send_command(self, command: str) -> None:
-        self._manager.send_device_command(self.serial, command)
+        return self._manager.send_device_command(command, self.serial)
 
     def close(self):
         self._manager.close_device(self.serial)

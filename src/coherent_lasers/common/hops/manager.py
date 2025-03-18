@@ -74,21 +74,21 @@ class HOPSManager:
         return handle
 
     def initialize_device(self, *, handle: COHRHOPS_HANDLE | None, serial: str | None = None) -> dict:
-        handle = self._get_device_handle(serial) if handle is None else handle
+        handle = self.get_device_handle(serial) if handle is None else handle
         return self._initialize_device_by_handle(handle)
 
     def close_device(self, *, handle: COHRHOPS_HANDLE | None, serial: str | None = None) -> None:
-        handle = self._get_device_handle(serial) if handle is None else handle
+        handle = self.get_device_handle(serial) if handle is None else handle
         res = self._close(handle)
         if res != COHRHOPS_OK:
             raise HOPSException("Error closing handle", res)
 
     def send_device_command(self, command: str, serial: str) -> str:
-        handle = self._get_device_handle(serial)
+        handle = self.get_device_handle(serial)
         response = C.create_string_buffer(MAX_STRLEN)
         res = self._send_command(handle, command.encode(), response)
         if res == COHRHOPS_OK:
-            return response.value.decode("utf-8")
+            return response.value.decode("utf-8").rstrip("\n").rstrip("\r")
         else:
             raise HOPSException("Error sending command", res)
 
